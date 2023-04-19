@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract VotingDApp {
+    string[] public candidates;
+    mapping(address => Voter) public voters;
+    address public admin;
+    uint public currentPhase;
+    address[] public votersArray;
+
+    struct Voter {
+        bool isRegistered;
+        bool hasVoted;
+        uint voteIndex;
+    }
+
+    event VoterRegistered(address indexed voter);
+    event VoteCasted(address indexed voter, uint indexed voteIndex);
+    event CandidateAdded(string indexed candidateName);
+
+    constructor() {
+        candidates.push("Candidate 1");
+        candidates.push("Candidate 2");
+        admin = msg.sender;
+        currentPhase = 1;
+    }
+
+    function getVoterAddresses() private view returns (address[] memory) {
+        return votersArray;
+    }
+
+    function registerVoter() public {
+        require(currentPhase == 1, "Registration is not open at the moment");
+        require(!voters[msg.sender].isRegistered, "You have already registered to vote");
+
+        voters[msg.sender] = Voter(true, false, 0);
+        votersArray.push(msg.sender);
+
+        emit VoterRegistered(msg.sender);
+    }
+
+    function startVoting() public onlyAdmin {
+        require(currentPhase == 1, "Cannot start voting at the moment");
+
+        currentPhase = 2;
+    }
+
+    function castVote(uint voteIndex) public {
+        require(currentPhase == 2, "Voting is not open at the moment");
+        require(voters[msg.sender].isRegistered, "You are not registered to vote");
+        require(!voters[msg.sender].hasVoted, "You have already casted your vote");
+        require(voteIndex < candidates.length, "Invalid vote index");
+
+        voters[msg.sender].hasVoted = true;
+        voters[msg.sender].voteIndex = voteIndex;
+
+        emit VoteCasted(msg.sender, voteIndex);
+    }
+
+    function endVoting() public onlyAdmin {
+        require(currentPhase == 2, "Cannot end voting at the moment");
+
+        currentPhase = 3;
+    }
+
+    function tallyVotes() public onlyAdmin view returns (uint[] memory) {
+        require(currentPhase == 3, "Tallying is not open at the moment");
+
+        uint[] memory voteCount = new uint[](candidates.length);
+        address[] memory voterAddresses = getVoterAddresses();
+
+        for (uint i = 0; i < voterAddresses.length; i++) {
+            address voterAddress = voterAddresses[i];
+            if (voters[voterAddress].hasVoted) {
+                uint voteIndex = voters[voterAddress].voteIndex;
+                require(voteIndex < candidates.length, "Invalid vote index");
+
+                voteCount[voteIndex]++;
+            }
+        }
+
+        return voteCount;
+    }
+
+    function addCandidate(string memory candidateName) public onlyAdmin {
+        candidates.push(candidateName);
+        emit CandidateAdded(candidateName);
+    }
+
+    function switchPhase(uint newPhase) public onlyAdmin {
+        require(newPhase > 0 && newPhase <= 3, "Invalid phase");
+        currentPhase = newPhase;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only the administrator can perform this action");
+        _;
+    }
+}
